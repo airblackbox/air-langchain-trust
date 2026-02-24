@@ -1,83 +1,71 @@
-"""
-air-crewai-trust — Configuration
-
-Pydantic models for all trust layer settings.
-Sensible defaults match the TypeScript openclaw-air-trust plugin.
-"""
+"""AIR Trust Layer configuration."""
 
 from __future__ import annotations
 
 from enum import Enum
-from pathlib import Path
-from typing import Literal
+from typing import Optional
 
 from pydantic import BaseModel, Field
 
 
 class RiskLevel(str, Enum):
-    CRITICAL = "critical"
-    HIGH = "high"
-    MEDIUM = "medium"
     LOW = "low"
-    NONE = "none"
+    MEDIUM = "medium"
+    HIGH = "high"
+    CRITICAL = "critical"
 
 
-RISK_ORDER: dict[RiskLevel, int] = {
-    RiskLevel.NONE: 0,
-    RiskLevel.LOW: 1,
-    RiskLevel.MEDIUM: 2,
-    RiskLevel.HIGH: 3,
-    RiskLevel.CRITICAL: 4,
-}
-
-
-class ConsentGateConfig(BaseModel):
-    enabled: bool = True
-    always_require: list[str] = Field(
-        default_factory=lambda: ["exec", "spawn", "shell", "deploy"]
-    )
-    never_require: list[str] = Field(
-        default_factory=lambda: ["fs_read", "search", "query"]
-    )
-    timeout_seconds: float = 30.0
-    risk_threshold: RiskLevel = RiskLevel.HIGH
-
-
-class AuditLedgerConfig(BaseModel):
-    enabled: bool = True
-    local_path: str = Field(
-        default_factory=lambda: str(
-            Path.home() / ".air-trust" / "audit-ledger.json"
-        )
-    )
-    forward_to_gateway: bool = False
-    max_entries: int = 10_000
-
-
-class VaultConfig(BaseModel):
-    enabled: bool = True
-    categories: list[str] = Field(
-        default_factory=lambda: ["api_key", "credential", "pii"]
-    )
-    custom_patterns: list[dict] = Field(default_factory=list)
-    forward_to_gateway: bool = False
-    ttl_seconds: int = 86_400  # 24 hours
-
-
-class InjectionDetectionConfig(BaseModel):
-    enabled: bool = True
-    sensitivity: Literal["low", "medium", "high"] = "medium"
-    block_threshold: float = 0.8
-    log_detections: bool = True
+class ConsentMode(str, Enum):
+    ALLOW_ALL = "allow_all"
+    BLOCK_CRITICAL = "block_critical"
+    BLOCK_HIGH_AND_CRITICAL = "block_high_and_critical"
+    BLOCK_ALL = "block_all"
 
 
 class AirTrustConfig(BaseModel):
-    enabled: bool = True
-    consent_gate: ConsentGateConfig = Field(default_factory=ConsentGateConfig)
-    audit_ledger: AuditLedgerConfig = Field(default_factory=AuditLedgerConfig)
-    vault: VaultConfig = Field(default_factory=VaultConfig)
-    injection_detection: InjectionDetectionConfig = Field(
-        default_factory=InjectionDetectionConfig
+    """Configuration for the AIR Trust Layer."""
+
+    enabled: bool = Field(default=True, description="Master switch for trust layer")
+    audit_enabled: bool = Field(default=True)
+    audit_secret: str = Field(default="air-trust-default-secret")
+    vault_enabled: bool = Field(default=True)
+    vault_patterns: dict[str, str] = Field(
+        default_factory=lambda: {
+            "ssn": r"\b\d{3}-\d{2}-\d{4}\b",
+            "credit_card": r"\b\d{4}[\s-]?\d{4}[\s-]?\d{4}[\s-]?\d{4}\b",
+            "email": r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b",
+            "api_key": r"\b(?:sk|pk|api[_-]?key)[_-]?[A-Za-z0-9]{20,}\b",
+            "phone": r"\b\d{3}[-.]?\d{3}[-.]?\d{4}\b",
+        },
     )
-    gateway_url: str | None = None
-    gateway_key: str | None = None
+    consent_enabled: bool = Field(default=True)
+    consent_mode: ConsentMode = Field(default=ConsentMode.BLOCK_CRITICAL)
+    tool_risk_levels: dict[str, RiskLevel] = Field(
+        default_factory=lambda: {
+            "shell": RiskLevel.CRITICAL,
+            "bash": RiskLevel.CRITICAL,
+            "exec": RiskLevel.CRITICAL,
+            "delete": RiskLevel.CRITICAL,
+            "rm": RiskLevel.CRITICAL,
+            "sql": RiskLevel.HIGH,
+            "database": RiskLevel.HIGH,
+            "send_email": RiskLevel.HIGH,
+            "http_request": RiskLevel.MEDIUM,
+            "file_read": RiskLevel.LOW,
+            "search": RiskLevel.LOW,
+        },
+    )
+    default_risk_level: RiskLevel = Field(default=RiskLevel.MEDIUM)
+    injection_enabled: bool = Field(default=True)
+    injection_patterns: list[str] = Field(
+        default_factory=lambda: [
+            r"ignore\s+(all\s+)?previous\s+instructions",
+            r"disregard\s+(all\s+)?prior\s+(instructions|context)",
+            r"you\s+are\s+now\s+(?:a\s+)?(?:DAN|jailbreak|unrestricted)",
+            r"system\s*:\s*you\s+(?:are|must|should|will)",
+            r"<\|(?:system|im_start)\|>",
+            r"ADMIN\s*OVERRIDE",
+            r"BEGIN\s+(?:NEW\s+)?INSTRUCTIONS",
+        ],
+    )
+    injection_block: bool = Field(default=True)

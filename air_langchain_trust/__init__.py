@@ -1,48 +1,40 @@
-"""
-air-langchain-trust — AIR Trust Layer for LangChain / LangGraph
+"""AIR Trust Layer for LangChain.
 
-Drop-in security, audit, and compliance layer for LangChain agents.
-Adds tamper-proof audit trails, sensitive data tokenization,
-consent gates for destructive tools, and prompt injection detection.
+Provides audit logging, PII tokenization, consent gating, and
+injection detection for LangChain agents via a callback handler.
 
-Usage:
-    from langchain_openai import ChatOpenAI
+Usage::
+
     from air_langchain_trust import AirTrustCallbackHandler
 
     handler = AirTrustCallbackHandler()
-    llm = ChatOpenAI(model="gpt-4")
-    result = llm.invoke("Hello", config={"callbacks": [handler]})
-
-    # Check what happened
-    print(handler.get_audit_stats())
-    print(handler.verify_chain())
+    chain.invoke(input, config={"callbacks": [handler]})
 """
 
-from __future__ import annotations
-
-from .config import (
-    RISK_ORDER,
-    AirTrustConfig,
-    AuditLedgerConfig,
-    ConsentGateConfig,
-    InjectionDetectionConfig,
-    RiskLevel,
-    VaultConfig,
-)
+from .audit_ledger import AuditEntry, AuditLedger
+from .config import AirTrustConfig, ConsentMode, RiskLevel
+from .consent_gate import ConsentDecision, ConsentGate
+from .data_vault import DataVault, TokenRecord
 from .errors import AirTrustError, ConsentDeniedError, InjectionBlockedError
 from .handler import AirTrustCallbackHandler
+from .injection_detector import InjectionDetector, InjectionResult
 
 __version__ = "0.1.0"
+
 __all__ = [
     "AirTrustCallbackHandler",
     "AirTrustConfig",
-    "AirTrustError",
-    "AuditLedgerConfig",
-    "ConsentDeniedError",
-    "ConsentGateConfig",
-    "InjectionBlockedError",
-    "InjectionDetectionConfig",
+    "ConsentMode",
     "RiskLevel",
-    "RISK_ORDER",
-    "VaultConfig",
+    "AuditLedger",
+    "AuditEntry",
+    "DataVault",
+    "TokenRecord",
+    "ConsentGate",
+    "ConsentDecision",
+    "InjectionDetector",
+    "InjectionResult",
+    "AirTrustError",
+    "ConsentDeniedError",
+    "InjectionBlockedError",
 ]

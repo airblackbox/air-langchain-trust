@@ -1,8 +1,10 @@
 # air-langchain-trust
 
-AIR Trust Layer plugin for LangChain. Adds audit logging, PII tokenization, consent gating, and prompt injection detection to any LangChain agent via a single callback handler.
+**EU AI Act compliance infrastructure for LangChain agents.** Drop-in callback handler that adds tamper-evident audit logging, PII tokenization, consent-based tool gating, and prompt injection detection — making your LangChain agent stack compliant with Articles 9, 10, 11, 12, 14, and 15 of the EU AI Act.
 
-Part of the [AIR Blackbox](https://github.com/airblackbox/gateway) ecosystem.
+Part of the [AIR Blackbox](https://github.com/airblackbox) ecosystem — the compliance layer for autonomous AI agents.
+
+> The EU AI Act enforcement date for high-risk AI systems is **August 2, 2026**. See the [full compliance mapping](./docs/eu-ai-act-compliance.md) for article-by-article coverage.
 
 ## Install
 
@@ -74,6 +76,28 @@ config = AirTrustConfig(
 
 handler = AirTrustCallbackHandler(config=config)
 ```
+
+## EU AI Act Compliance
+
+| EU AI Act Article | Requirement | AIR Feature |
+|---|---|---|
+| Art. 9 | Risk management | ConsentGate risk classification |
+| Art. 10 | Data governance | DataVault PII tokenization |
+| Art. 11 | Technical documentation | Full call graph audit logging |
+| Art. 12 | Record-keeping | HMAC-SHA256 tamper-evident chain |
+| Art. 14 | Human oversight | Consent-based tool blocking |
+| Art. 15 | Robustness & security | InjectionDetector + multi-layer defense |
+
+See [docs/eu-ai-act-compliance.md](./docs/eu-ai-act-compliance.md) for the full article-by-article mapping.
+
+## AIR Blackbox Ecosystem
+
+| Package | Framework | Install |
+|---|---|---|
+| `air-langchain-trust` | LangChain / LangGraph | `pip install air-langchain-trust` |
+| `air-crewai-trust` | CrewAI | `pip install air-crewai-trust` |
+| `openclaw-air-trust` | TypeScript / Node.js | `npm install openclaw-air-trust` |
+| Gateway | Any HTTP agent | `docker pull ghcr.io/airblackbox/gateway:main` |
 
 ## Tests
 

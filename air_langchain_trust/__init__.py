@@ -1,40 +1,48 @@
-"""AIR Trust Layer for LangChain.
+"""
+air-langchain-trust — AIR Trust Layer for LangChain / LangGraph
 
-Provides audit logging, PII tokenization, consent gating, and
-injection detection for LangChain agents via a callback handler.
+Drop-in security, audit, and compliance layer for LangChain agents.
+Adds tamper-proof audit trails, sensitive data tokenization,
+consent gates for destructive tools, and prompt injection detection.
 
-Usage::
-
+Usage:
+    from langchain_openai import ChatOpenAI
     from air_langchain_trust import AirTrustCallbackHandler
 
     handler = AirTrustCallbackHandler()
-    chain.invoke(input, config={"callbacks": [handler]})
+    llm = ChatOpenAI(model="gpt-4")
+    result = llm.invoke("Hello", config={"callbacks": [handler]})
+
+    # Check what happened
+    print(handler.get_audit_stats())
+    print(handler.verify_chain())
 """
 
-from .audit_ledger import AuditEntry, AuditLedger
-from .config import AirTrustConfig, ConsentMode, RiskLevel
-from .consent_gate import ConsentDecision, ConsentGate
-from .data_vault import DataVault, TokenRecord
+from __future__ import annotations
+
+from .config import (
+    RISK_ORDER,
+    AirTrustConfig,
+    AuditLedgerConfig,
+    ConsentGateConfig,
+    InjectionDetectionConfig,
+    RiskLevel,
+    VaultConfig,
+)
 from .errors import AirTrustError, ConsentDeniedError, InjectionBlockedError
 from .handler import AirTrustCallbackHandler
-from .injection_detector import InjectionDetector, InjectionResult
 
 __version__ = "0.1.0"
-
 __all__ = [
     "AirTrustCallbackHandler",
     "AirTrustConfig",
-    "ConsentMode",
-    "RiskLevel",
-    "AuditLedger",
-    "AuditEntry",
-    "DataVault",
-    "TokenRecord",
-    "ConsentGate",
-    "ConsentDecision",
-    "InjectionDetector",
-    "InjectionResult",
     "AirTrustError",
+    "AuditLedgerConfig",
     "ConsentDeniedError",
+    "ConsentGateConfig",
     "InjectionBlockedError",
+    "InjectionDetectionConfig",
+    "RiskLevel",
+    "RISK_ORDER",
+    "VaultConfig",
 ]

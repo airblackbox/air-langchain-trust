@@ -1,112 +1,164 @@
 # air-langchain-trust
 
-**EU AI Act compliance infrastructure for LangChain agents.** Drop-in callback handler that adds tamper-evident audit logging, PII tokenization, consent-based tool gating, and prompt injection detection — making your LangChain agent stack compliant with Articles 9, 10, 11, 12, 14, and 15 of the EU AI Act.
+**AIR Trust Layer for LangChain / LangGraph** — Drop-in security, audit, and compliance for your AI agents.
 
-Part of the [AIR Blackbox](https://github.com/airblackbox) ecosystem — the compliance layer for autonomous AI agents.
+Part of the [AIR Blackbox](https://airblackbox.com) ecosystem. Adds tamper-proof audit trails, sensitive data tokenization, consent gates for destructive tools, and prompt injection detection to any LangChain or LangGraph project.
 
-> The EU AI Act enforcement date for high-risk AI systems is **August 2, 2026**. See the [full compliance mapping](./docs/eu-ai-act-compliance.md) for article-by-article coverage.
-
-## Install
+## Quick Start
 
 ```bash
 pip install air-langchain-trust
 ```
-
-## Quick Start
 
 ```python
 from langchain_openai import ChatOpenAI
 from langchain.agents import AgentExecutor, create_openai_tools_agent
 from air_langchain_trust import AirTrustCallbackHandler
 
+# Create the trust handler
 handler = AirTrustCallbackHandler()
 
-# Attach to any chain or agent
-result = agent_executor.invoke(
-    {"input": "What's the weather?"},
-    config={"callbacks": [handler]},
+# Use it with any LangChain component via config
+llm = ChatOpenAI(model="gpt-4")
+result = llm.invoke(
+    "What is the capital of France?",
+    config={"callbacks": [handler]}
 )
 
-# Inspect the audit trail
-for entry in handler.audit.get_entries():
-    print(f"{entry.action}: {entry.details}")
+# Or with agents — callbacks propagate to all child components
+result = agent_executor.invoke(
+    {"input": "Search for AI safety papers"},
+    config={"callbacks": [handler]}
+)
+
+# Check what happened
+print(handler.get_audit_stats())
+print(handler.verify_chain())
 ```
 
 ## What It Does
 
-**AuditLedger** — HMAC-SHA256 chained log of every tool call, LLM invocation, and chain execution. Tamper-evident: if any entry is modified, the chain breaks.
+### Tamper-Proof Audit Trail
+Every tool call, LLM invocation, and chain execution is logged to an HMAC-SHA256 signed chain. Each entry references the previous entry's hash — modify any record and the chain breaks.
 
-**DataVault** — Tokenizes PII (emails, SSNs, credit cards, API keys) before it reaches your logs. Reversible for authorized use.
+### Sensitive Data Tokenization
+API keys, credentials, PII (emails, SSNs, phone numbers, credit cards) are automatically detected in tool inputs and LLM prompts, logged as tokenized versions. **14 built-in patterns** covering API keys, credentials, and PII.
 
-**ConsentGate** — Classifies tools by risk level (low/medium/high/critical) and blocks execution when risk exceeds your threshold. Raises `ConsentDeniedError`.
-
-**InjectionDetector** — Scans prompts for injection patterns (instruction override, jailbreak, authority impersonation). Raises `InjectionBlockedError`.
-
-## How Blocking Works
-
-LangChain callbacks are observation-only — they can't return False to stop execution. This plugin raises custom exceptions (`ConsentDeniedError`, `InjectionBlockedError`) which halt the chain. Catch them in your application code:
+### Consent Gate
+Destructive tools are blocked until the user explicitly approves them. Unlike CrewAI (where hooks return False), LangChain callbacks block by **raising exceptions**:
 
 ```python
-from air_langchain_trust.errors import ConsentDeniedError, InjectionBlockedError
+from air_langchain_trust import ConsentDeniedError, InjectionBlockedError
 
 try:
     result = agent.invoke(input, config={"callbacks": [handler]})
 except ConsentDeniedError as e:
-    print(f"Blocked: {e.tool_name} (risk: {e.risk_level})")
+    print(f"Tool '{e.tool_name}' blocked (risk: {e.risk_level})")
 except InjectionBlockedError as e:
-    print(f"Injection detected: {e.pattern_name}")
+    print(f"Injection detected (score: {e.score}, patterns: {e.patterns})")
 ```
+
+| Risk Level | Tools | Action |
+|-----------|-------|--------|
+| **Critical** | exec, spawn, shell | Always requires consent |
+| **High** | fs_write, deploy, git_push | Requires consent (default) |
+| **Medium** | send_email, http_request | Configurable |
+| **Low** | fs_read, search, query | Auto-approved |
+
+### Prompt Injection Detection
+15+ weighted patterns detect prompt injection attempts including role overrides, jailbreaks, delimiter injection, privilege escalation, and data exfiltration.
 
 ## Configuration
 
 ```python
-from air_langchain_trust import AirTrustCallbackHandler, AirTrustConfig, ConsentMode, RiskLevel
+from air_langchain_trust import AirTrustCallbackHandler, AirTrustConfig
 
 config = AirTrustConfig(
-    consent_mode=ConsentMode.BLOCK_HIGH_AND_CRITICAL,
-    tool_risk_levels={
-        "shell": RiskLevel.CRITICAL,
-        "sql_query": RiskLevel.HIGH,
-        "web_search": RiskLevel.LOW,
+    consent_gate={
+        "enabled": True,
+        "always_require": ["exec", "spawn", "shell", "deploy"],
+        "risk_threshold": "high",
     },
-    injection_block=True,
-    vault_enabled=True,
-    audit_secret="your-hmac-secret",
+    vault={
+        "enabled": True,
+        "categories": ["api_key", "credential", "pii"],
+    },
+    injection_detection={
+        "enabled": True,
+        "sensitivity": "medium",
+        "block_threshold": 0.8,
+    },
+    audit_ledger={
+        "enabled": True,
+        "max_entries": 10000,
+    },
+    # Optional: forward to AIR Blackbox gateway
+    gateway_url="https://your-gateway.example.com",
+    gateway_key="your-api-key",
 )
 
-handler = AirTrustCallbackHandler(config=config)
+handler = AirTrustCallbackHandler(config)
 ```
 
-## EU AI Act Compliance
+## LangChain Callback Mapping
 
-| EU AI Act Article | Requirement | AIR Feature |
-|---|---|---|
-| Art. 9 | Risk management | ConsentGate risk classification |
-| Art. 10 | Data governance | DataVault PII tokenization |
-| Art. 11 | Technical documentation | Full call graph audit logging |
-| Art. 12 | Record-keeping | HMAC-SHA256 tamper-evident chain |
-| Art. 14 | Human oversight | Consent-based tool blocking |
-| Art. 15 | Robustness & security | InjectionDetector + multi-layer defense |
+| LangChain Callback | Trust Components |
+|-------------------|-----------------|
+| `on_tool_start` | ConsentGate → DataVault → AuditLedger |
+| `on_tool_end` | AuditLedger |
+| `on_tool_error` | AuditLedger |
+| `on_llm_start` | InjectionDetector → DataVault → AuditLedger |
+| `on_llm_end` | AuditLedger |
+| `on_chain_start` | AuditLedger |
+| `on_chain_end` | AuditLedger |
 
-See [docs/eu-ai-act-compliance.md](./docs/eu-ai-act-compliance.md) for the full article-by-article mapping.
+## Works with LangGraph Too
+
+```python
+from langgraph.graph import StateGraph
+from air_langchain_trust import AirTrustCallbackHandler
+
+handler = AirTrustCallbackHandler()
+graph = StateGraph(...)
+app = graph.compile()
+
+# Callbacks propagate through the entire graph
+result = app.invoke(input, config={"callbacks": [handler]})
+```
+
+## API Reference
+
+```python
+from air_langchain_trust import AirTrustCallbackHandler
+
+handler = AirTrustCallbackHandler(config=None)
+
+# Inspection methods
+handler.get_audit_stats()   # → {"total_entries": 42, "chain_valid": True, ...}
+handler.verify_chain()      # → {"valid": True, "total_entries": 42}
+handler.export_audit()      # → [{"id": "...", "action": "tool_call", ...}, ...]
+handler.get_vault_stats()   # → {"total_tokens": 5, "by_category": {"api_key": 3}}
+```
 
 ## AIR Blackbox Ecosystem
 
-| Package | Framework | Install |
-|---|---|---|
-| `air-langchain-trust` | LangChain / LangGraph | `pip install air-langchain-trust` |
-| `air-crewai-trust` | CrewAI | `pip install air-crewai-trust` |
-| `openclaw-air-trust` | TypeScript / Node.js | `npm install openclaw-air-trust` |
-| Gateway | Any HTTP agent | `docker pull ghcr.io/airblackbox/gateway:main` |
-| [air-compliance](https://pypi.org/project/air-compliance/) | Compliance Scanner | `pip install air-compliance` |
+| Repository | Purpose |
+|-----------|---------|
+| [air-blackbox-gateway](https://github.com/nostalgicskinco/air-blackbox-gateway) | Go proxy gateway |
+| [air-python-sdk](https://github.com/nostalgicskinco/air-python-sdk) | Python SDK |
+| [openclaw-air-trust](https://github.com/nostalgicskinco/openclaw-air-trust) | TypeScript trust layer for OpenClaw |
+| [air-crewai-trust](https://github.com/nostalgicskinco/air-crewai-trust) | Python trust layer for CrewAI |
+| **air-langchain-trust** | **Python trust layer for LangChain** (this repo) |
 
-## Tests
+## Development
 
 ```bash
+git clone https://github.com/nostalgicskinco/air-langchain-trust.git
+cd air-langchain-trust
 pip install -e ".[dev]"
 pytest tests/ -v
 ```
 
 ## License
 
-Apache-2.0
+MIT

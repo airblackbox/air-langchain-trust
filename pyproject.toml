@@ -40,7 +40,7 @@ dev = [
 Homepage = "https://github.com/airblackbox/air-langchain-trust"
 Repository = "https://github.com/airblackbox/air-langchain-trust"
 Issues = "https://github.com/airblackbox/air-langchain-trust/issues"
-Documentation = "https://airblackbox.com/docs"
+Documentation = "https://airblackbox.ai"
 
 [tool.setuptools.packages.find]
 include = ["air_langchain_trust*"]

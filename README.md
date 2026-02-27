@@ -2,7 +2,7 @@
 
 **AIR Trust Layer for LangChain / LangGraph** — Drop-in security, audit, and compliance for your AI agents.
 
-Part of the [AIR Blackbox](https://airblackbox.com) ecosystem. Adds tamper-proof audit trails, sensitive data tokenization, consent gates for destructive tools, and prompt injection detection to any LangChain or LangGraph project.
+Part of the [AIR Blackbox](https://airblackbox.ai) ecosystem. Adds tamper-proof audit trails, sensitive data tokenization, consent gates for destructive tools, and prompt injection detection to any LangChain or LangGraph project.
 
 ## Quick Start
 
@@ -144,16 +144,16 @@ handler.get_vault_stats()   # → {"total_tokens": 5, "by_category": {"api_key":
 
 | Repository | Purpose |
 |-----------|---------|
-| [air-blackbox-gateway](https://github.com/nostalgicskinco/air-blackbox-gateway) | Go proxy gateway |
-| [air-python-sdk](https://github.com/nostalgicskinco/air-python-sdk) | Python SDK |
-| [openclaw-air-trust](https://github.com/nostalgicskinco/openclaw-air-trust) | TypeScript trust layer for OpenClaw |
-| [air-crewai-trust](https://github.com/nostalgicskinco/air-crewai-trust) | Python trust layer for CrewAI |
+| [air-compliance-checker](https://github.com/airblackbox/air-compliance-checker) | Core CLI scanner |
+| [air-proxy](https://github.com/airblackbox/air-proxy) | Go reverse proxy gateway |
+| [air-openai-trust](https://github.com/airblackbox/air-openai-trust) | Trust layer for OpenAI Agents SDK |
+| [air-crewai-trust](https://github.com/airblackbox/air-crewai-trust) | Python trust layer for CrewAI |
 | **air-langchain-trust** | **Python trust layer for LangChain** (this repo) |
 
 ## Development
 
 ```bash
-git clone https://github.com/nostalgicskinco/air-langchain-trust.git
+git clone https://github.com/airblackbox/air-langchain-trust.git
 cd air-langchain-trust
 pip install -e ".[dev]"
 pytest tests/ -v

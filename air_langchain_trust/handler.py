@@ -30,7 +30,8 @@ from .audit_ledger import AuditLedger
 from .config import AirTrustConfig
 from .consent_gate import ConsentGate
 from .data_vault import DataVault
-from .errors import ConsentDeniedError, InjectionBlockedError
+from .errors import AirTrustError, ConsentDeniedError, InjectionBlockedError
+from .gate_client import GateClient
 from .injection_detector import InjectionDetector
 
 logger = logging.getLogger("air_langchain_trust")
@@ -82,6 +83,12 @@ class AirTrustCallbackHandler(BaseCallbackHandler):  # type: ignore[misc]
         )
         self.injection_detector = InjectionDetector(self.config.injection_detection)
 
+        # Gate client for centralized policy enforcement
+        self.gate = GateClient(
+            gateway_url=self.config.gateway_url,
+            gateway_key=self.config.gateway_key,
+        )
+
     # ─── Tool Callbacks ───────────────────────────────────────
 
     def on_tool_start(
@@ -109,8 +116,30 @@ class AirTrustCallbackHandler(BaseCallbackHandler):  # type: ignore[misc]
             if vault_result["tokenized"]:
                 data_tokenized = True
 
-        # 2. Check consent gate — raises ConsentDeniedError if blocked
-        if self.config.consent_gate.enabled:
+        # 2. Check Gate policy (if configured) — centralized enforcement
+        gate_decision = None
+        if self.gate.is_configured:
+            gate_decision = self.gate.submit_action(
+                agent_id=metadata.get("agent_id", "langchain-agent") if metadata else "langchain-agent",
+                action_type="tool_call",
+                tool_name=tool_name,
+                payload=inputs or {"input": input_str[:500]},
+            )
+            if gate_decision:
+                decision = gate_decision.get("decision", "")
+                if decision == "blocked":
+                    logger.warning(f"Gate BLOCKED: {tool_name} — {gate_decision.get('reason', '')}")
+                    raise ConsentDeniedError(
+                        tool_name=tool_name,
+                        risk_level="blocked_by_gate",
+                    )
+                elif decision == "pending_approval":
+                    logger.info(f"Gate PENDING: {tool_name} — sent to Slack for approval")
+                elif decision == "auto_allowed":
+                    logger.debug(f"Gate AUTO-ALLOWED: {tool_name}")
+
+        # 3. Check local consent gate (fallback if Gate not configured)
+        if not gate_decision and self.config.consent_gate.enabled:
             consent_result = self.consent_gate.intercept(
                 tool_name,
                 inputs or {"input": input_str},
@@ -122,7 +151,7 @@ class AirTrustCallbackHandler(BaseCallbackHandler):  # type: ignore[misc]
                     risk_level=risk.value,
                 )
 
-        # 3. Log to audit ledger
+        # 4. Log to audit ledger
         if self.config.audit_ledger.enabled:
             self.ledger.append(
                 action="tool_call",

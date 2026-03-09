@@ -30,11 +30,13 @@ from .config import (
     VaultConfig,
 )
 from .errors import AirTrustError, ConsentDeniedError, InjectionBlockedError
+from .gate_client import GateClient
 from .handler import AirTrustCallbackHandler
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 __all__ = [
     "AirTrustCallbackHandler",
+    "GateClient",
     "AirTrustConfig",
     "AirTrustError",
     "AuditLedgerConfig",
